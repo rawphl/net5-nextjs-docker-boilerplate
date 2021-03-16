@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  database:
+    container_name: database
+    image: postgres:latest
+    ports: 
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - ./api/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  api:
+    container_name: api
+    build: ./api 
+    ports:
+      - "5000:5000"
+    depends_on: 
+      - database
+
+  frontend:
+    container_name: frontend
+    build: ./frontend
+    environment: 
+      - API_BASE_URL=http://api:5000
+    ports:
+      - "3000:3000"
