@@ -1,6 +1,6 @@
 export default ({ data }) => (
 	<main>
-		<h1>Welcome to asdsadsadsad.js</h1>
+		<h1>Welcome to net5, next.js and docker!</h1>
 		<pre>
 			{JSON.stringify(data, null, 2)}
 		</pre>

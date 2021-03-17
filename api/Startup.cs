@@ -14,6 +14,7 @@ using Microsoft.IdentityModel.Tokens;
 using System;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.ResponseCompression;
+using api.Services;
 
 namespace api
 {
@@ -34,13 +35,14 @@ namespace api
             services.AddIdentity<ApplicationUser, IdentityRole>()
                 .AddEntityFrameworkStores<ApplicationDbContext>()
                 .AddDefaultTokenProviders();
-                            services.AddAuthentication(options =>
+            services.AddAuthentication(options =>
             {
                 options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
                 options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
             }).AddJwtBearer(options =>
             {
-                options.RequireHttpsMetadata = true;
+                options.RequireHttpsMetadata = false; // TODO
                 options.SaveToken = true;
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
@@ -74,11 +76,19 @@ namespace api
             {
                 options.Level = System.IO.Compression.CompressionLevel.Optimal;
             });
-            //services.AddTransient<JwtService>();
-            //services.AddTransient<NetCore3JWT.Services.AuthenticationService>();
+            services.AddTransient<JwtService>();
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "My API", Version = "v1" });
+                c.AddSecurityDefinition("BearerAuth", new OpenApiSecurityScheme
+                {
+                    Type = SecuritySchemeType.Http,
+                    Scheme = JwtBearerDefaults.AuthenticationScheme.ToLowerInvariant(),
+                    In = ParameterLocation.Header,
+                    Name = "Authorization",
+                    BearerFormat = "JWT",
+                    Description = "JWT Authorization header using the Bearer scheme."
+                });
             });
 
         }

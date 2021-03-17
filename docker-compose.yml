@@ -18,6 +18,8 @@ services:
       - "5000:5000"
     depends_on: 
       - database
+    volumes:
+      - ./api:/app
 
   frontend:
     container_name: frontend
@@ -26,3 +28,5 @@ services:
       - API_BASE_URL=http://api:5000
     ports:
       - "3000:3000"
+    volumes:
+      - ./frontend:/app

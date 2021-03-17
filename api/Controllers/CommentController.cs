@@ -21,7 +21,7 @@ namespace api.Controllers
 		{
 			var comment = _context.Comments;
 
-			return Ok(new List<Comment>(){ new Comment()});
+			return Ok(new List<Comment>(){ new Comment(), new Comment(), new Comment()});
 		}
 
 		[HttpGet("{id}", Name = "GetCommentById")]

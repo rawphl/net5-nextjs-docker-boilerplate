@@ -16,13 +16,15 @@ using System.IdentityModel.Tokens.Jwt;
 using api.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
+using api.Entities;
 
 namespace api.Controllers
 {
     public class Credentials
     {
-        public string? Username { get; set; }
-        public string? Password { get; set; }
+        public string? name { get; set; }
+        public string? password { get; set; }
     }
 
     [Route("api/[controller]")]
@@ -32,31 +34,57 @@ namespace api.Controllers
     {
         private readonly JwtService JwtService;
         private readonly IConfiguration Configuration;
-
-        public AuthenticationController(JwtService service,  IConfiguration configuration)
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly ApplicationDbContext _appDbContext;
+        public AuthenticationController(JwtService service, IConfiguration configuration, UserManager<ApplicationUser> userManager, ApplicationDbContext appDbContext)
         {
             JwtService = service;
             Configuration = configuration;
+            _userManager = userManager;
+            _appDbContext = appDbContext;
         }
-        
-        [HttpPost("login")]
-        public ActionResult<dynamic> Login([FromBody] Credentials credentials)
-        {
-            if(string.IsNullOrEmpty(credentials.Username) || string.IsNullOrEmpty(credentials.Password))
-            {
-                return BadRequest();
-            }
 
-            //var result = AuthenticationService.Authenticate(credentials.Username, credentials.Password);
-       
-            if (!IsValidCredentials(credentials)) return Unauthorized();
+        [HttpGet("users")]
+        public async Task<ActionResult<dynamic>> Users()
+        {
+            return Ok(_appDbContext.Users);
+        }
+
+        [HttpPost("login")]
+        public async Task<ActionResult<dynamic>> Login([FromBody] Credentials credentials)
+        {
+            if (!ModelState.IsValid) return BadRequest();
+            var existingUser = await _userManager.FindByNameAsync(credentials.name);
+            if (existingUser == null) return Unauthorized();
+            var isCorrect = await _userManager.CheckPasswordAsync(existingUser, credentials.password);
+            if (!isCorrect) return Unauthorized();
 
             var claims = new[] {
-                new Claim("name", credentials.Username)
+                new Claim(JwtRegisteredClaimNames.NameId, existingUser.Id),
+                new Claim("name", existingUser.UserName)
             };
 
             var (token, refreshToken) = JwtService.GenerateTokens(claims);
             return Ok(new { token, refreshToken });
+        }
+
+        [HttpPost("register")]
+        public async Task<ActionResult<dynamic>> Register([FromBody] Credentials credentials)
+        {
+            if (!ModelState.IsValid) return BadRequest();
+            var existingUser = await _userManager.FindByNameAsync(credentials.name);
+            if (existingUser != null) return BadRequest();
+
+            var created = await _userManager.CreateAsync(new ApplicationUser()
+            {
+                UserName = credentials.name
+            }, credentials.password);
+
+            if(!created.Succeeded) {
+                return BadRequest(created.Errors.Select(x => x.Description).ToList());
+            }
+
+            return Ok(new { message = "User created" });
         }
 
         [HttpPost("refresh")]
@@ -70,7 +98,7 @@ namespace api.Controllers
             var savedRefreshToken = refreshToken; //retrieve the refresh token from a data store
             if (savedRefreshToken != refreshToken)
                 throw new SecurityTokenException("Invalid refresh token");
-            
+
             var claims = new[] {
                 new Claim("name", username)
             };
@@ -82,11 +110,5 @@ namespace api.Controllers
 
             return Ok(newToken);
         }
-
-        private bool IsValidCredentials(Credentials credentials)
-        {
-            return credentials.Username == "rawphl" && credentials.Password == "lol";
-        }
-
     }
 }
