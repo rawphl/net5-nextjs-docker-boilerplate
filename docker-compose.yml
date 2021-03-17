@@ -20,6 +20,8 @@ services:
       - database
     volumes:
       - ./api:/app
+      - /app/bin
+      - /app/obj
 
   frontend:
     container_name: frontend

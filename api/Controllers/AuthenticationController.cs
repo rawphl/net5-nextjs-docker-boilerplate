@@ -17,6 +17,8 @@ using api.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Identity;
 using api.Entities;
+using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
 
 namespace api.Controllers
 {
@@ -37,18 +39,21 @@ namespace api.Controllers
         private readonly IConfiguration Configuration;
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ApplicationDbContext _appDbContext;
+        private readonly ILogger _logger;
         
-        public AuthenticationController(JwtService service, IConfiguration configuration, UserManager<ApplicationUser> userManager, ApplicationDbContext appDbContext)
+        public AuthenticationController(ILogger<AuthenticationController> logger, JwtService service, IConfiguration configuration, UserManager<ApplicationUser> userManager, ApplicationDbContext appDbContext)
         {
             JwtService = service;
             Configuration = configuration;
             _userManager = userManager;
             _appDbContext = appDbContext;
+            _logger = logger;
         }
 
         [HttpPost("login")]
         public async Task<ActionResult<dynamic>> Login([FromBody] Credentials credentials)
         {
+            _logger.LogInformation("login", credentials.email);
             if (!ModelState.IsValid) return BadRequest();
             var existingUser = await _userManager.FindByEmailAsync(credentials.email);
             if (existingUser == null) return Unauthorized();
@@ -61,9 +66,13 @@ namespace api.Controllers
             };
 
             var (token, refreshToken) = JwtService.GenerateTokens(claims);
+            var rt = new RefreshToken() {
+                UserId = existingUser.Id,
+                Token = refreshToken
+            };
 
-            existingUser.refreshToken = refreshToken;
-            await _userManager.UpdateAsync(existingUser);
+            await _appDbContext.RefreshTokens.AddAsync(rt);
+            await _appDbContext.SaveChangesAsync();
 
             return Ok(new { token, refreshToken });
         }
@@ -92,22 +101,25 @@ namespace api.Controllers
         }
 
         [HttpPost("refresh")]
-        public IActionResult Refresh()
+        public async Task<IActionResult> Refresh()
         {
             var token = Request.Headers["Authorization"].ToString().Split(' ')[1];
             var refreshToken = Request.Headers["RefreshToken"];
-
             var principal = JwtService.GetPrincipalFromExpiredToken(token);
-
-            var savedRefreshToken = refreshToken; //retrieve the refresh token from a data store
-            if (savedRefreshToken != refreshToken)
-                throw new SecurityTokenException("Invalid refresh token");
-
-                
-
+            //var userId = principal.Claims
+            var userId = "rfl";
+            var storedToken = await _appDbContext.RefreshTokens.FirstOrDefaultAsync(x => x.UserId == userId);
+            if (storedToken?.Token != refreshToken) {
+                //throw new SecurityTokenException("Invalid refresh token");
+                return Unauthorized("Invalid refresh token");
+            }
+            _logger.LogInformation(storedToken.Token);
             var (newToken, newRefreshToken) = JwtService.GenerateTokens(principal.Claims);
-
-            return Ok(newToken);
+                        _logger.LogInformation(newRefreshToken);
+            storedToken.Token = newRefreshToken;
+            _appDbContext.RefreshTokens.Update(storedToken);
+            await _appDbContext.SaveChangesAsync();
+            return Ok(new { newToken, refreshToken });
         }
     }
 }

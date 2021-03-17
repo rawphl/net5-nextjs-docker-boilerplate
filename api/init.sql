@@ -1,2 +1,2 @@
-CREATE DATABASE posts;
-grant all privileges on database posts to postgres;
+CREATE DATABASE app;
+grant all privileges on database app to postgres;

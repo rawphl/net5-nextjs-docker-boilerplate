@@ -4,6 +4,5 @@ namespace api.Entities
 {
   public class ApplicationUser : IdentityUser
   {
-    		public string? refreshToken { get; set; }
   }
 }
